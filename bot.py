@@ -39,7 +39,7 @@ def handle_video(message):
             bot.send_video(message.chat.id, video)
             
     except Exception as e:
-        bot.send_message(message.chat.id, "দুঃখিত, কোনো একটি সমস্যা হয়েছে বা ভিডিও সাইজ অনেক বড়। (টেলিগ্রাম বটের ফ্রি লিমিট 20MB)")
+        bot.send_message(message.chat.id, f"দুঃখিত, একটি সমস্যা হয়েছে: {e}")
     
     finally:
         # সার্ভার থেকে ফাইলগুলো মুছে ফেলা (যাতে স্টোরেজ ফুল না হয়)
