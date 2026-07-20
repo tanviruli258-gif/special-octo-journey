@@ -29,10 +29,21 @@ def handle_video(message):
             
         bot.send_message(message.chat.id, "ডাউনলোড শেষ! এখন 3GP তে কনভার্ট করা হচ্ছে...")
         
-        # FFmpeg কমান্ড (নতুন এবং নিরাপদ পদ্ধতি)
-        command = ["ffmpeg", "-y", "-i", input_file, "-s", "352x288", "-b:v", "400k", "-b:a", "64k", "-ar", "8000", "-ac", "1", output_file]
+        # FFmpeg কমান্ড (এখানে এনকোডার ফিক্স করা হয়েছে: -c:v mpeg4 এবং -c:a aac)
+        command = [
+            "ffmpeg", "-y", 
+            "-i", input_file, 
+            "-c:v", "mpeg4", 
+            "-c:a", "aac", 
+            "-s", "352x288", 
+            "-b:v", "400k", 
+            "-b:a", "64k", 
+            "-ar", "8000", 
+            "-ac", "1", 
+            output_file
+        ]
         
-        # কমান্ড রান করা এবং এরর ধরিয়ে দেওয়া
+        # কমান্ড রান করা 
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         
         # যদি কনভার্ট ফেইল করে
@@ -46,7 +57,7 @@ def handle_video(message):
             bot.send_video(message.chat.id, video)
             
     except Exception as e:
-        bot.send_message(message.chat.id, f"দুঃখিত, পাইথনে একটি সমস্যা হয়েছে: {e}")
+        bot.send_message(message.chat.id, f"দুঃখিত, একটি সমস্যা হয়েছে: {e}")
     
     finally:
         # স্টোরেজ ক্লিয়ার করা
