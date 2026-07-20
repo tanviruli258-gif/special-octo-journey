@@ -67,3 +67,25 @@ bot.on("video", async (ctx) => {
 bot.launch();
 
 console.log("✅ Bot Started...");
+const { convertTo3GP } = require("./converter");
+
+// MP4 → 3GP Convert
+await convertTo3GP(input, output);
+
+await ctx.reply("📤 Uploading your 3GP file...");
+
+// Send file
+await ctx.replyWithDocument({
+    source: output,
+    filename: "converted.3gp"
+});
+
+// Delete temporary files
+try {
+    await fs.remove(input);
+    await fs.remove(output);
+} catch (e) {
+    console.error("Cleanup error:", e);
+}
+
+await ctx.reply("✅ Conversion completed successfully.");
