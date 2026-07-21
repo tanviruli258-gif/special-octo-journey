@@ -8,7 +8,7 @@ BOT_TOKEN = "8548108469:AAFmnValzLDBJEiLOfLefWmjknVQ5swuuGI"
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # IMPORTANT: নিচে 123456789 এর জায়গায় আপনার নিজের টেলিগ্রাম User ID বসান
-ADMIN_ID = 7392861032  
+ADMIN_ID = 7392861032
 
 # ডাটাবেজ ছাড়া বর্তমান ইউজার ট্র্যাক করার জন্য
 unique_users = set()
