@@ -8,7 +8,7 @@ import yt_dlp
 BOT_TOKEN = "8548108469:AAFmnValzLDBJEiLOfLefWmjknVQ5swuuGI"
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# আপনার টেলিগ্রাম User ID
+# আপনার টেলিগ্রাম User ID (এখানে আপনার আইডি বসান)
 ADMIN_ID = 6468726869  
 
 unique_users = set()
@@ -76,14 +76,16 @@ def handle_social_links(message):
 
     user_links[user_id] = message.text
     
+    # এখানে ৩টি বাটন যুক্ত করা হয়েছে
     markup = InlineKeyboardMarkup()
     markup.row(
+        InlineKeyboardButton("🎞️ Video", callback_data="fmt_video"),
         InlineKeyboardButton("🎥 3GP", callback_data="fmt_3gp"),
         InlineKeyboardButton("🎵 Audio", callback_data="fmt_audio")
     )
     bot.reply_to(message, "Choose format:", reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data in ['fmt_3gp', 'fmt_audio'])
+@bot.callback_query_handler(func=lambda call: call.data in ['fmt_video', 'fmt_3gp', 'fmt_audio'])
 def process_link_callback(call):
     user_id = call.message.chat.id
     
@@ -97,10 +99,9 @@ def process_link_callback(call):
     bot.edit_message_text("⏳ Downloading...", chat_id=user_id, message_id=call.message.message_id)
     
     raw_file = None
-    output_file = f"{user_id}.3gp" if format_type == 'fmt_3gp' else f"{user_id}.mp3"
+    output_file = None
     
     try:
-        # ডাইনামিক ফাইলের নাম নেওয়ার জন্য আপডেট করা হয়েছে
         ydl_opts = {
             'outtmpl': f'{user_id}_raw.%(ext)s',
             'format': 'best',
@@ -112,22 +113,31 @@ def process_link_callback(call):
             info = ydl.extract_info(url, download=True)
             raw_file = ydl.prepare_filename(info)
             
-        bot.edit_message_text("🔄 Converting...", chat_id=user_id, message_id=call.message.message_id)
-        
-        if format_type == 'fmt_3gp':
+        # কনভার্ট লজিক
+        if format_type == 'fmt_video':
+            # ভিডিওর জন্য কনভার্ট করার দরকার নেই, ডাউনলোড করা ফাইলটিই পাঠিয়ে দেব
+            output_file = raw_file
+            bot.edit_message_text("✅ Uploading Video...", chat_id=user_id, message_id=call.message.message_id)
+            
+        elif format_type == 'fmt_3gp':
+            output_file = f"{user_id}.3gp"
+            bot.edit_message_text("🔄 Converting to 3GP...", chat_id=user_id, message_id=call.message.message_id)
             command = ["ffmpeg", "-y", "-i", raw_file, "-c:v", "mpeg4", "-c:a", "aac", "-s", "352x288", "-b:v", "400k", "-b:a", "64k", "-ar", "8000", "-ac", "1", output_file]
-        else:
+            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode != 0:
+                raise Exception(f"FFmpeg Error: {result.stderr[-100:]}")
+            bot.edit_message_text("✅ Uploading 3GP...", chat_id=user_id, message_id=call.message.message_id)
+            
+        elif format_type == 'fmt_audio':
+            output_file = f"{user_id}.mp3"
+            bot.edit_message_text("🔄 Extracting Audio...", chat_id=user_id, message_id=call.message.message_id)
             command = ["ffmpeg", "-y", "-i", raw_file, "-q:a", "0", "-map", "a", output_file]
-            
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode != 0:
+                raise Exception(f"FFmpeg Error: {result.stderr[-100:]}")
+            bot.edit_message_text("✅ Uploading Audio...", chat_id=user_id, message_id=call.message.message_id)
         
-        if result.returncode != 0:
-            bot.edit_message_text(f"❌ Conversion Error:\n`{result.stderr[-100:]}`", chat_id=user_id, message_id=call.message.message_id, parse_mode='Markdown')
-            bot.send_message(ADMIN_ID, f"⚠️ Error by `{user_id}`:\n`{result.stderr[-200:]}`", parse_mode='Markdown')
-            return
-            
-        bot.edit_message_text("✅ Uploading...", chat_id=user_id, message_id=call.message.message_id)
-        
+        # ইউজারের লিমিট আপডেট
         user_usage[user_id] = user_usage.get(user_id, 0) + 1
         rem = MAX_LIMIT - user_usage[user_id]
         
@@ -135,8 +145,9 @@ def process_link_callback(call):
         if user_id != ADMIN_ID:
             caption += f"\n📊 Limit left: {rem}"
             
+        # ফাইল সেন্ড করা
         with open(output_file, 'rb') as f:
-            if format_type == 'fmt_3gp':
+            if format_type in ['fmt_video', 'fmt_3gp']:
                 bot.send_video(user_id, f, caption=caption)
             else:
                 bot.send_audio(user_id, f, caption=caption)
@@ -145,12 +156,14 @@ def process_link_callback(call):
         del user_links[user_id]
         
     except Exception as e:
-        # এবার যেকোনো এরর হলে সাথে সাথেই স্ক্রিনে দেখাবে
         bot.edit_message_text(f"❌ Error:\n`{str(e)[:100]}`", chat_id=user_id, message_id=call.message.message_id, parse_mode='Markdown')
         bot.send_message(ADMIN_ID, f"⚠️ System Error:\n`{e}`", parse_mode='Markdown')
     finally:
-        if raw_file and os.path.exists(raw_file): os.remove(raw_file)
-        if os.path.exists(output_file): os.remove(output_file)
+        # স্টোরেজ ক্লিয়ার করা
+        if raw_file and os.path.exists(raw_file): 
+            os.remove(raw_file)
+        if output_file and output_file != raw_file and os.path.exists(output_file): 
+            os.remove(output_file)
 
 @bot.message_handler(content_types=['video', 'document'])
 def handle_direct_video(message):
@@ -175,7 +188,7 @@ def handle_direct_video(message):
         with open(input_file, 'wb') as new_file:
             new_file.write(downloaded_file)
             
-        bot.edit_message_text("🔄 Converting...", chat_id=user_id, message_id=status_msg.message_id)
+        bot.edit_message_text("🔄 Converting to 3GP...", chat_id=user_id, message_id=status_msg.message_id)
         
         command = ["ffmpeg", "-y", "-i", input_file, "-c:v", "mpeg4", "-c:a", "aac", "-s", "352x288", "-b:v", "400k", "-b:a", "64k", "-ar", "8000", "-ac", "1", output_file]
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
