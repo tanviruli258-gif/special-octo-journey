@@ -3,6 +3,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import subprocess
 import yt_dlp
+import glob
 
 # আপনার টোকেন
 BOT_TOKEN = "7685589352:AAEfJKL8kOKemZ5wTAnHhUwMeX6i3sz0ujc"
@@ -65,7 +66,6 @@ def manage_users(message):
         except:
             bot.reply_to(message, "⚠️ Format: `/ban user_id`")
 
-# ফেসবুকের আরও কিছু লিংক ফরম্যাট অ্যাড করা হয়েছে
 @bot.message_handler(func=lambda message: any(x in message.text.lower() for x in ['youtube.com', 'youtu.be', 'facebook.com', 'fb.watch', 'tiktok.com', 'fb.com']))
 def handle_social_links(message):
     user_id = message.chat.id
@@ -101,18 +101,27 @@ def process_link_callback(call):
     output_file = f"{user_id}.3gp" if format_type == 'fmt_3gp' else f"{user_id}.mp3"
     
     try:
-        # ফেসবুকের জন্য অপশন আপডেট করা হয়েছে
+        # YouTube Anti-Block এবং Facebook ফিক্স
         ydl_opts = {
             'outtmpl': f'{user_id}_raw.%(ext)s',
             'format': 'best',
             'max_filesize': 50000000,
             'quiet': True,
             'noplaylist': True,
-            'nocheckcertificate': True # ফেসবুকের জন্য সহায়ক
+            'nocheckcertificate': True,
+            'geo_bypass': True,
+            'extractor_args': {'youtube': ['player_client=android']} # ইউটিউবকে বোকা বানানোর ট্রিক
         }
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            raw_file = ydl.prepare_filename(info)
+            ydl.download([url])
+            
+        # ফাইলটি যেকোনো এক্সটেনশনে নামুক না কেন, সেটি খুঁজে বের করা হবে
+        downloaded_files = glob.glob(f"{user_id}_raw.*")
+        if not downloaded_files:
+            raise Exception("Download failed, or blocked by YouTube/Facebook.")
+        
+        raw_file = downloaded_files[0]
             
         bot.edit_message_text("🔄 Converting...", chat_id=user_id, message_id=call.message.message_id)
         
@@ -150,10 +159,11 @@ def process_link_callback(call):
         bot.edit_message_text(f"❌ Error:\n`{str(e)[:100]}`", chat_id=user_id, message_id=call.message.message_id, parse_mode='Markdown')
         bot.send_message(ADMIN_ID, f"⚠️ System Error:\n`{e}`", parse_mode='Markdown')
     finally:
-        # আগের glob লজিকটি না থাকায়, ফাইল ক্লিনআপের জন্য ট্রাই-ক্যাচ ব্লক দেওয়া হলো
         try:
-            if raw_file and os.path.exists(raw_file): os.remove(raw_file)
-            if os.path.exists(output_file): os.remove(output_file)
+            for f in glob.glob(f"{user_id}_raw.*"):
+                os.remove(f)
+            if os.path.exists(output_file): 
+                os.remove(output_file)
         except:
             pass
 
