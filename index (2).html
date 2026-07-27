@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MP4 to 3GP Converter (Server)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    color: #f2f2f2;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 16px;
+    padding: 30px;
+    max-width: 480px;
+    width: 100%;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  }
+  h1 { font-size: 22px; margin-top: 0; text-align: center; }
+  p.sub { text-align: center; color: #cfd8dc; font-size: 13px; margin-top: -8px; margin-bottom: 20px; }
+  input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border: 1px dashed rgba(255,255,255,0.4);
+    margin-bottom: 16px;
+  }
+  select, button {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 15px;
+    margin-bottom: 12px;
+    cursor: pointer;
+  }
+  select {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.3);
+  }
+  button {
+    background: linear-gradient(90deg,#00c6ff,#0072ff);
+    color: #fff;
+    font-weight: 600;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #status { font-size: 13px; color: #b0bec5; text-align: center; min-height: 18px; margin-top: 10px;}
+  .spinner {
+    border: 3px solid rgba(255,255,255,0.2);
+    border-top: 3px solid #00c6ff;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    animation: spin 0.8s linear infinite;
+    margin: 10px auto;
+    display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .note {
+    font-size: 11.5px;
+    color: #90a4ae;
+    margin-top: 16px;
+    line-height: 1.5;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>📱 MP4 → 3GP Converter</h1>
+  <p class="sub">Server-side ffmpeg (Railway) — বড় ভিডিও, ফাস্ট কনভার্সন</p>
+
+  <form id="convertForm">
+    <input type="file" id="fileInput" name="video" accept="video/*" required />
+
+    <select id="qualitySelect" name="quality">
+      <option value="qcif">QCIF (176x144) — সাধারণ বাটন ফোন</option>
+      <option value="sqcif">SQCIF (128x96) — খুবই পুরনো/লো-এন্ড ফোন</option>
+      <option value="cif">CIF (352x288) — কিছুটা নতুন বাটন ফোন</option>
+    </select>
+
+    <button type="submit" id="convertBtn">3GP তে কনভার্ট করুন</button>
+  </form>
+
+  <div class="spinner" id="spinner"></div>
+  <div id="status"></div>
+
+  <div class="note">
+    <strong>নোট:</strong> কনভার্সন সার্ভারে (native ffmpeg দিয়ে) হয়, তাই বড় ফাইলও ফাস্ট ও রিলায়েবল ভাবে কাজ করবে। ভিডিও H.263 কোডেকে এবং সাউন্ড AAC তে এনকোড হয়ে .3gp ফাইল হিসেবে ডাউনলোড হবে।
+  </div>
+</div>
+
+<script>
+const form = document.getElementById("convertForm");
+const statusEl = document.getElementById("status");
+const spinner = document.getElementById("spinner");
+const convertBtn = document.getElementById("convertBtn");
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fileInput = document.getElementById("fileInput");
+  if (!fileInput.files.length) return;
+
+  convertBtn.disabled = true;
+  spinner.style.display = "block";
+  statusEl.textContent = "কনভার্ট হচ্ছে... বড় ফাইলে কিছুটা সময় লাগতে পারে, ধৈর্য ধরুন।";
+
+  const formData = new FormData(form);
+
+  try {
+    const res = await fetch("/convert", { method: "POST", body: formData });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || "কনভার্সন ব্যর্থ হয়েছে");
+    }
+
+    const blob = await res.blob();
+    const originalName = fileInput.files[0].name.replace(/\.[^/.]+$/, "");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = originalName + ".3gp";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    statusEl.textContent = "✅ সম্পন্ন — ডাউনলোড শুরু হয়েছে";
+  } catch (err) {
+    statusEl.textContent = "❌ " + err.message;
+  } finally {
+    convertBtn.disabled = false;
+    spinner.style.display = "none";
+  }
+});
+</script>
+
+</body>
+</html>
